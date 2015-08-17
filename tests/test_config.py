@@ -4,8 +4,8 @@ import unittest.mock
 
 import lxml.etree
 
-import offlinecopy.config as config
-import offlinecopy.target as target
+import offlinecopy_impl.config as config
+import offlinecopy_impl.target as target
 
 
 class Testextract_flat_nodes(unittest.TestCase):
@@ -82,11 +82,11 @@ class Testload_targets(unittest.TestCase):
         base = unittest.mock.Mock()
         with contextlib.ExitStack() as stack:
             extract_flat_nodes = stack.enter_context(unittest.mock.patch(
-                "offlinecopy.config.extract_flat_nodes",
+                "offlinecopy_impl.config.extract_flat_nodes",
                 new=base.extract_flat_nodes,
             ))
             Target = stack.enter_context(unittest.mock.patch(
-                "offlinecopy.target.Target",
+                "offlinecopy_impl.target.Target",
                 new=base.Target,
             ))
 
@@ -132,11 +132,11 @@ class Testsave_targets(unittest.TestCase):
 
         with contextlib.ExitStack() as stack:
             embed_flat_nodes = stack.enter_context(unittest.mock.patch(
-                "offlinecopy.config.embed_flat_nodes",
+                "offlinecopy_impl.config.embed_flat_nodes",
                 new=base.embed_flat_nodes
             ))
             E = stack.enter_context(unittest.mock.patch(
-                "offlinecopy.config.E",
+                "offlinecopy_impl.config.E",
                 new=base.E
             ))
 

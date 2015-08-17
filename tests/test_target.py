@@ -3,7 +3,7 @@ import os.path
 import unittest
 import unittest.mock
 
-import offlinecopy.target as target
+import offlinecopy_impl.target as target
 
 
 class Testrebase_rules(unittest.TestCase):

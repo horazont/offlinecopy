@@ -1,0 +1,4 @@
+#!/usr/bin/python3
+import offlinecopy_impl.main
+
+offlinecopy_impl.main.main()
