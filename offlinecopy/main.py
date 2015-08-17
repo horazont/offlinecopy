@@ -18,8 +18,15 @@ from . import config, target
 
 def get_targets_path():
     return os.path.join(
-        xdg.BaseDirectory.save_config_path("fancysync"),
+        xdg.BaseDirectory.save_config_path("offlinecopy"),
         "targets.xml"
+    )
+
+
+def get_config_path():
+    return os.path.join(
+        xdg.BaseDirectory.save_config_path("offlinecopy"),
+        "config.ini"
     )
 
 
@@ -35,34 +42,52 @@ def FilterFile(t):
             os.unlink(f.name)
 
 
-def resync(t, dry_run=False):
-    cmd = ["rsync", "-raHEAXSP", "--delete"]
+def rsync_target(cfg, t,
+                 verbosity=0,
+                 revert=False,
+                 dry_run=False,
+                 delete=True):
+    cmd = ["rsync", "-raHEAXS"]
+
+    options = cfg.get("offlinecopy", "rsync-options", fallback="").strip()
+    if options:
+        cmd.append(options)
+
+    if delete:
+        cmd.append("--delete")
+
+    if verbosity <= 0:
+        pass
+    elif verbosity <= 1:
+        cmd.append("-v")
+    elif verbosity <= 2:
+        cmd.append("--progress")
+        cmd.append("--itemize-changes")
 
     with FilterFile(t) as name:
         cmd.extend(["--filter", ". {}".format(name)])
-        cmd.append(t.src + "/")
-        cmd.append(t.dest + "/")
+        if revert:
+            cmd.append(t.src + "/")
+            cmd.append(t.dest + "/")
+        else:
+            cmd.append(t.dest + "/")
+            cmd.append(t.src + "/")
+
         if dry_run:
             apply_dry_run_mode(cmd, dry_run)
+
         subprocess.check_call(cmd)
 
 
-def backsync(t, dry_run=False):
-    cmd = ["rsync", "-raHEAXSP", "--delete"]
-
-    with FilterFile(t) as name:
-        cmd.extend(["--filter", ". {}".format(name)])
-        cmd.append(t.dest + "/")
-        cmd.append(t.src + "/")
-        if dry_run:
-            apply_dry_run_mode(cmd, dry_run)
-        subprocess.check_call(cmd)
-
-
-def read_config(f):
+def read_config(path):
     parser = configparser.ConfigParser()
-    parser.read_file(f)
-
+    try:
+        f = open(path, "r")
+    except FileNotFoundError:
+        pass
+    else:
+        with f:
+            parser.read_file(f)
     return parser
 
 
@@ -167,7 +192,7 @@ def cmdfunc_include(args, cfg, targets):
     write_targets(get_targets_path(), targets)
 
 
-def cmdfunc_backsync(args, cfg, targets):
+def cmdfunc_push(args, cfg, targets):
     selection = {os.path.realpath(path) for path in args.targets}
     if not selection:
         matched_targets = list(targets)
@@ -186,10 +211,13 @@ def cmdfunc_backsync(args, cfg, targets):
                 sys.exit(1)
 
     for t in matched_targets:
-        backsync(t, args.dry_run)
+        rsync_target(cfg, t,
+                     dry_run=args.dry_run,
+                     revert=False,
+                     verbosity=args.verbosity)
 
 
-def cmdfunc_resync(args, cfg, targets):
+def cmdfunc_revert(args, cfg, targets):
     selection = {os.path.realpath(path) for path in args.targets}
     if not selection and not args.map_none_to_all:
         print("no target selected (did you mean --all?)", file=sys.stderr)
@@ -211,7 +239,10 @@ def cmdfunc_resync(args, cfg, targets):
                 sys.exit(1)
 
     for t in matched_targets:
-        resync(t, args.dry_run)
+        rsync_target(cfg, t,
+                     dry_run=args.dry_run,
+                     revert=True,
+                     verbosity=args.verbosity)
 
 
 def cmdfunc_list(args, cfg, targets):
@@ -253,6 +284,14 @@ def main():
         description="""\
 fancysync allows to selectively pick directories which are synchronized with a
 remote target (or possibly another directory)."""
+    )
+
+    parser.add_argument(
+        "-v",
+        help="Increase verbosity (up to -vvv)",
+        action="count",
+        default=0,
+        dest="verbosity",
     )
 
     subparsers = parser.add_subparsers(metavar="command")
@@ -318,8 +357,8 @@ any of its contents) from synchronisation."""
     )
     cmd_include.set_defaults(cmd=cmdfunc_include)
 
-    cmd_backsync = subparsers.add_parser(
-        "backsync",
+    cmd_push = subparsers.add_parser(
+        "push",
         help="Transfer one or more targets to their source",
         description="""\
 Synchronize all matching targets to their source. This is done with
@@ -328,24 +367,24 @@ If you do not want that behaviour, use the evict subcommand to mark directories
 which are just deleted locally and whose deletion shall not propagate back to
 the source."""
     )
-    cmd_backsync.add_argument(
+    cmd_push.add_argument(
         "targets",
         metavar="PATH",
         nargs="*",
         help="Zero or more target destination directiories. If none is given, "
         "all targets are synced back"
     )
-    dry_run_argument(cmd_backsync)
-    cmd_backsync.set_defaults(cmd=cmdfunc_backsync)
+    dry_run_argument(cmd_push)
+    cmd_push.set_defaults(cmd=cmdfunc_push)
 
-    cmd_resync = subparsers.add_parser(
-        "resync",
+    cmd_revert = subparsers.add_parser(
+        "revert",
         help="Transfer one or more targets from their source",
         description="""\
 Any matched target is re-transmitted from the source; the existing contents
 which are not evicted are removed from the destination."""
     )
-    cmd_resync.add_argument(
+    cmd_revert.add_argument(
         "--all",
         action="store_true",
         dest="map_none_to_all",
@@ -353,14 +392,14 @@ which are not evicted are removed from the destination."""
         help="If and only if this switch is given, supplying no targets is"
         " valid and is equivalent to specifying *all* registered targets."
     )
-    cmd_resync.add_argument(
+    cmd_revert.add_argument(
         "targets",
         metavar="PATH",
         nargs="*",
         help="One or more target destination directories."
     )
-    dry_run_argument(cmd_resync)
-    cmd_resync.set_defaults(cmd=cmdfunc_resync)
+    dry_run_argument(cmd_revert)
+    cmd_revert.set_defaults(cmd=cmdfunc_revert)
 
     cmd_status = subparsers.add_parser(
         "list",
@@ -374,8 +413,7 @@ which are not evicted are removed from the destination."""
         print("no command selected", file=sys.stderr)
         sys.exit(1)
 
-    config = configparser.ConfigParser()
-
+    config = read_config(get_config_path())
     targets = read_targets(get_targets_path())
 
     args.cmd(args, config, targets)
