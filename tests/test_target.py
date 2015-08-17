@@ -39,6 +39,7 @@ class Testpath_split(unittest.TestCase):
             target.path_split("/A/B/C/"),
         )
 
+
 class TestNode(unittest.TestCase):
     def setUp(self):
         self.n1 = target.Node()
@@ -90,6 +91,16 @@ class TestNode(unittest.TestCase):
             (self.n2, ()),
         )
 
+        self.assertEqual(
+            self.n1.get_node(""),
+            (self.n1, ()),
+        )
+
+        self.assertEqual(
+            self.n1.get_node("/"),
+            (self.n1, ()),
+        )
+
     def test_ensure_node(self):
         self.assertIs(
             self.n1.ensure_node("foo/bar/"),
@@ -106,6 +117,28 @@ class TestNode(unittest.TestCase):
         self.assertIs(self.n1.childmap["bar"], parent_node)
         self.assertIs(new_node.parent, parent_node)
         self.assertIs(parent_node.childmap["baz"], new_node)
+
+    def test_prune_includes_in_included(self):
+        nroot = target.Node()
+        n1 = target.Node(parent=nroot)
+        nroot.childmap["foo"] = n1
+        n1.state = target.State.INCLUDED
+
+        nroot.prune()
+        self.assertNotIn("foo", nroot.childmap)
+
+    def test_prune_evictions_in_evicted(self):
+        nroot = target.Node()
+        n1 = target.Node(parent=nroot)
+        nroot.childmap["foo"] = n1
+        n1.state = target.State.EVICTED
+        n2 = target.Node(parent=n1)
+        n1.childmap["bar"] = n2
+        n2.state = target.State.EVICTED
+
+        nroot.prune()
+        self.assertIn("foo", nroot.childmap)
+        self.assertNotIn("bar", nroot.childmap["foo"].childmap)
 
     def test_clear(self):
         self.n1.clear()
@@ -183,6 +216,22 @@ class TestTarget(unittest.TestCase):
         self.assertSequenceEqual(
             list(self.target.iter_filter_rules()),
             [
+            ]
+        )
+
+    def test_evict_root(self):
+        self.assertSequenceEqual(
+            list(self.target.iter_filter_rules()),
+            [
+            ]
+        )
+
+        self.target.evict("")
+
+        self.assertSequenceEqual(
+            list(self.target.iter_filter_rules()),
+            [
+                ("-", "*"),
             ]
         )
 
@@ -281,6 +330,28 @@ class TestTarget(unittest.TestCase):
             list(self.target.iter_flat_nodes()),
             [
                 (target.State.EVICTED, "A"),
+                (target.State.INCLUDED, "A/B/C"),
+                (target.State.EVICTED, "A/B/C/D"),
+                (target.State.INCLUDED, "A/E"),
+            ]
+        )
+
+    def test_iter_flat_nodes_evicted_root(self):
+        self.assertSequenceEqual(
+            list(self.target.iter_flat_nodes()),
+            [
+            ]
+        )
+
+        self.target.evict("")
+        self.target.include("A/B/C")
+        self.target.evict("A/B/C/D")
+        self.target.include("A/E")
+
+        self.assertSequenceEqual(
+            list(self.target.iter_flat_nodes()),
+            [
+                (target.State.EVICTED, ""),
                 (target.State.INCLUDED, "A/B/C"),
                 (target.State.EVICTED, "A/B/C/D"),
                 (target.State.INCLUDED, "A/E"),

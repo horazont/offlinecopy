@@ -24,8 +24,8 @@ def path_split(path):
 
 
 class State(Enum):
-    INCLUDED = "+"
-    EVICTED = "-"
+    INCLUDED = "included"
+    EVICTED = "evicted"
 
 
 class Node:
@@ -76,20 +76,29 @@ class Node:
                     self.parent.get_state() == State.EVICTED):
                 yield ("+", None)
         elif self.state == State.EVICTED:
-            yield ("-", None)
+            if self.parent is None:
+                yield ("-", "*")
+            else:
+                yield ("-", None)
 
     def iter_rules(self):
         yield from self._iter_rules(State.INCLUDED)
 
     def iter_nodes(self):
         if self.state is not None:
-            yield (self.state, None)
+            yield (self.state, None if self.parent is not None else "")
         for segment, child in sorted(self.childmap.items(),
                                      key=lambda x: x[0]):
             yield from rebase_rules(
                 segment,
                 child.iter_nodes()
             )
+
+    def prune(self):
+        for segment, child in list(self.childmap.items()):
+            child.prune()
+            if child.state == self.get_state() and not child.childmap:
+                del self.childmap[segment]
 
     def clear(self):
         self.childmap.clear()
@@ -129,3 +138,6 @@ class Target:
         for state, path in flat_nodes:
             node = self.rules.ensure_node(path)
             node.state = state
+
+    def prune(self):
+        self.rules.prune()
