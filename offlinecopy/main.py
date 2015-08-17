@@ -164,7 +164,7 @@ def cmdfunc_include(args, cfg, targets):
     t.include(relpath)
     t.prune()
 
-    write_targets(cfg, targets)
+    write_targets(get_targets_path(), targets)
 
 
 def cmdfunc_backsync(args, cfg, targets):

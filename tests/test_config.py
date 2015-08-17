@@ -4,8 +4,8 @@ import unittest.mock
 
 import lxml.etree
 
-import fancysync.config as config
-import fancysync.target as target
+import offlinecopy.config as config
+import offlinecopy.target as target
 
 
 class Testextract_flat_nodes(unittest.TestCase):
@@ -82,11 +82,11 @@ class Testload_targets(unittest.TestCase):
         base = unittest.mock.Mock()
         with contextlib.ExitStack() as stack:
             extract_flat_nodes = stack.enter_context(unittest.mock.patch(
-                "fancysync.config.extract_flat_nodes",
+                "offlinecopy.config.extract_flat_nodes",
                 new=base.extract_flat_nodes,
             ))
             Target = stack.enter_context(unittest.mock.patch(
-                "fancysync.target.Target",
+                "offlinecopy.target.Target",
                 new=base.Target,
             ))
 
@@ -132,11 +132,11 @@ class Testsave_targets(unittest.TestCase):
 
         with contextlib.ExitStack() as stack:
             embed_flat_nodes = stack.enter_context(unittest.mock.patch(
-                "fancysync.config.embed_flat_nodes",
+                "offlinecopy.config.embed_flat_nodes",
                 new=base.embed_flat_nodes
             ))
             E = stack.enter_context(unittest.mock.patch(
-                "fancysync.config.E",
+                "offlinecopy.config.E",
                 new=base.E
             ))
 

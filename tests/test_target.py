@@ -3,7 +3,7 @@ import os.path
 import unittest
 import unittest.mock
 
-import fancysync.target as target
+import offlinecopy.target as target
 
 
 class Testrebase_rules(unittest.TestCase):
