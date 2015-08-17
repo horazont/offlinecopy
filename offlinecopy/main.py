@@ -56,13 +56,12 @@ def rsync_target(cfg, t,
     if delete:
         cmd.append("--delete")
 
-    if verbosity <= 0:
-        pass
-    elif verbosity <= 1:
+    if verbosity >= 1:
         cmd.append("-v")
-    elif verbosity <= 2:
-        cmd.append("--progress")
         cmd.append("--itemize-changes")
+
+    if verbosity <= 2:
+        cmd.append("--progress")
 
     with FilterFile(t) as name:
         cmd.extend(["--filter", ". {}".format(name)])
@@ -193,6 +192,10 @@ def cmdfunc_include(args, cfg, targets):
 
 
 def cmdfunc_push(args, cfg, targets):
+    if args.diff:
+        args.dry_run = DryRunMode.RSYNC
+        args.verbosity = 1
+
     selection = {os.path.realpath(path) for path in args.targets}
     if not selection:
         matched_targets = list(targets)
@@ -366,6 +369,13 @@ Synchronize all matching targets to their source. This is done with
 If you do not want that behaviour, use the evict subcommand to mark directories
 which are just deleted locally and whose deletion shall not propagate back to
 the source."""
+    )
+    cmd_push.add_argument(
+        "--diff",
+        action="store_true",
+        default=False,
+        help="Equivalent to `--dry-run rsync' and `-v`, i.e. shows the diff to"
+        " the remote."
     )
     cmd_push.add_argument(
         "targets",
