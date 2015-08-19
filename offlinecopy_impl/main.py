@@ -285,7 +285,7 @@ def dry_run_argument(parser):
 def main():
     parser = argparse.ArgumentParser(
         description="""\
-fancysync allows to selectively pick directories which are synchronized with a
+offlinecopy allows to selectively pick directories which are synchronized with a
 remote target (or possibly another directory)."""
     )
 
