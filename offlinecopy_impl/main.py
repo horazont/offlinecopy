@@ -246,7 +246,7 @@ def cmdfunc_include(args, cfg, targets):
         cmd.append("--ignore-existing")
 
         cmd.append(os.path.join(t.src, relpath[1:])+"/")
-        cmd.append(os.path.join(t.dest, relpath[1:])+"/")
+        cmd.append(t.dest / relpath[1:])
 
         subprocess.check_call(cmd)
 
