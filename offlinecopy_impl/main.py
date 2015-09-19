@@ -140,7 +140,7 @@ def write_targets(path, targets):
 def get_target_from_path(targets, path):
     for target in targets:
         target_dest = target.dest.resolve()
-        if target_dest in path.parents:
+        if target_dest in path.parents or target_dest == path:
             return target, str(path)[len(str(target_dest)):]
     return None, None
 
@@ -166,6 +166,9 @@ def cmdfunc_add(args, cfg, targets):
             print("error: the destination is parent of another target"
                   ": {}".format(t.dest), file=sys.stderr)
             sys.exit(1)
+
+    if dest.is_dir() and not args.source.endswith("/"):
+        args.source += "/"
 
     new_target = target.Target(args.source, dest)
     targets.append(new_target)
@@ -211,7 +214,12 @@ def cmdfunc_exclude(args, cfg, targets):
 
 
 def cmdfunc_include(args, cfg, targets):
-    path = pathlib.Path(args.path).resolve()
+    path = pathlib.Path(args.path)
+    try:
+        path = path.resolve()
+    except FileNotFoundError:
+        pass
+
     t, relpath = get_target_from_path(targets, path)
     if t is None:
         print("error: {!r} is not in any target".format(str(path)),
