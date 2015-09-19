@@ -1,5 +1,6 @@
 import itertools
 import os.path
+import pathlib
 
 from enum import Enum
 
@@ -109,7 +110,7 @@ class Node:
 class Target:
     def __init__(self, src, dest):
         self.src = src
-        self.dest = dest
+        self.dest = pathlib.Path(dest)
 
         self.rules = Node()
         self.rules.state = State.EVICTED

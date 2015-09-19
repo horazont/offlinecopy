@@ -1,5 +1,6 @@
 import contextlib
 import os.path
+import pathlib
 import unittest
 import unittest.mock
 
@@ -164,7 +165,7 @@ class TestTarget(unittest.TestCase):
 
         self.assertEqual(
             self.target.dest,
-            self.dest
+            pathlib.Path(self.dest)
         )
 
     def test_base_filter_rules(self):

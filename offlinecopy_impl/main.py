@@ -2,6 +2,7 @@ import argparse
 import configparser
 import contextlib
 import os.path
+import pathlib
 import shutil
 import subprocess
 import sys
@@ -75,12 +76,17 @@ def rsync_target(cfg, t,
     with FilterFile(t) as name:
         cmd.extend(["--filter", ". {}".format(name)])
         cmd.extend(additional_args)
+
+        dest_path = str(t.dest)
+        if t.dest.is_dir():
+            dest_path += "/"
+
         if revert:
-            cmd.append(t.src + "/")
-            cmd.append(t.dest + "/")
+            cmd.append(t.src)
+            cmd.append(dest_path)
         else:
-            cmd.append(t.dest + "/")
-            cmd.append(t.src + "/")
+            cmd.append(dest_path)
+            cmd.append(t.src)
 
         if dry_run:
             apply_dry_run_mode(cmd, dry_run)
@@ -112,7 +118,19 @@ def read_targets(path):
     return list(config.load_targets(targets))
 
 
+def validate_targets(targets):
+    for target in targets:
+        if target.dest.is_dir() and not target.src.endswith("/"):
+            print("warning: directory target {!r} uses non-directory source"
+                  " {!r}".format(
+                      str(target.dest),
+                      target.src),
+                  file=sys.stderr)
+
+
 def write_targets(path, targets):
+    validate_targets(targets)
+
     root = config.E.targets()
     config.save_targets(root, targets)
     data = lxml.etree.tostring(root, encoding="utf-8")
@@ -123,19 +141,32 @@ def write_targets(path, targets):
 
 def get_target_from_path(targets, path):
     for target in targets:
-        target_dest = os.path.realpath(target.dest)
-        if path.startswith(target_dest):
-            return target, path[len(target_dest):]
+        target_dest = target.dest.resolve()
+        if target_dest in path.parents:
+            return target, str(path)[len(str(target_dest)):]
     return None, None
 
 
+def get_target_by_path(targets, path):
+    for target in targets:
+        target_dest = target.dest.resolve()
+        if target_dest == path:
+            return target
+
+
 def cmdfunc_add(args, cfg, targets):
-    dest = os.path.realpath(args.dest)
+    dest = pathlib.Path(args.dest).resolve()
+    parents = list(dest.parents)
 
     for t in targets:
-        target_dest = os.path.realpath(t.dest)
-        if target_dest.startswith(dest) or dest.startswith(target_dest):
-            print("the destination is already covered by another target")
+        target_dest = t.dest.resolve()
+        if target_dest in parents or dest == target_dest:
+            print("error: the destination is already covered by another target"
+                  ": {}".format(t.dest))
+            sys.exit(1)
+        if dest in target_dest.parents:
+            print("error: the destination is parent of another target"
+                  ": {}".format(t.dest))
             sys.exit(1)
 
     new_target = target.Target(args.source, dest)
@@ -145,16 +176,12 @@ def cmdfunc_add(args, cfg, targets):
 
 
 def cmdfunc_remove(args, cfg, targets):
-    dest = os.path.realpath(args.dest).rstrip("/")
-
-    for target in targets:
-        target_dest = os.path.realpath(args.dest).rstrip("/")
-        if target_dest == dest:
-            break
-    else:
-        print("no target matching path: {}".format(dest),
+    dest = pathlib.Path(args.dest).resolve()
+    target = get_target_by_path(targets, dest)
+    if target is None:
+        print("error: {!r} is not a target".format(str(dest)),
               file=sys.stderr)
-        sys.exit(1)
+        return 1
 
     targets.remove(target)
 
@@ -162,11 +189,12 @@ def cmdfunc_remove(args, cfg, targets):
 
 
 def cmdfunc_exclude(args, cfg, targets):
-    path = os.path.realpath(args.path)
+    path = pathlib.Path(args.path).resolve()
     t, relpath = get_target_from_path(targets, path)
 
     if t is None:
-        print("no target holds {}".format(path), file=sys.stderr)
+        print("error: {!r} is not inside a target".format(str(path)),
+              file=sys.stderr)
         sys.exit(1)
 
     state = t.get_state(relpath)
@@ -184,7 +212,7 @@ def cmdfunc_exclude(args, cfg, targets):
 
 
 def cmdfunc_include(args, cfg, targets):
-    path = os.path.realpath(args.path)
+    path = pathlib.Path(args.path).resolve()
     t, relpath = get_target_from_path(targets, path)
     if t is None:
         print("not target holds {}".format(path), file=sys.stderr)
@@ -222,13 +250,14 @@ def cmdfunc_push(args, cfg, targets):
         args.dry_run = DryRunMode.RSYNC
         args.verbosity = 1
 
-    selection = {os.path.realpath(path) for path in args.targets}
+    selection = {pathlib.Path(path).resolve() for path in args.targets}
+
     if not selection:
         matched_targets = list(targets)
     else:
         matched_targets = []
         for t in targets:
-            target_dest = os.path.realpath(t.dest)
+            target_dest = pathlib.Path(t.dest).resolve()
             if target_dest in selection:
                 matched_targets.append(t)
                 selection.remove(target_dest)
@@ -248,7 +277,8 @@ def cmdfunc_push(args, cfg, targets):
 
 
 def cmdfunc_revert(args, cfg, targets):
-    selection = {os.path.realpath(path) for path in args.targets}
+    selection = {pathlib.Path(path).resolve() for path in args.targets}
+
     if not selection and not args.map_none_to_all:
         print("no target selected (did you mean --all?)", file=sys.stderr)
         sys.exit(1)
@@ -257,7 +287,7 @@ def cmdfunc_revert(args, cfg, targets):
     else:
         matched_targets = []
         for t in targets:
-            target_dest = os.path.realpath(t.dest)
+            target_dest = t.dest.resolve()
             if target_dest in selection:
                 matched_targets.append(t)
                 selection.remove(target_dest)
@@ -278,7 +308,10 @@ def cmdfunc_revert(args, cfg, targets):
 
 def cmdfunc_list(args, cfg, targets):
     for target in targets:
-        print("{} => {}".format(target.src, target.dest))
+        dest_path = target.dest
+        if dest_path.is_dir():
+            dest_path = str(dest_path) + "/"
+        print("{} => {}".format(target.src, dest_path))
         for state, path in target.iter_filter_rules():
             print("  {} {}".format(state, path))
 

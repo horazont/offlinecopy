@@ -32,6 +32,6 @@ def load_targets(subtree):
 
 def save_targets(parent, targets):
     for t in targets:
-        el = E.target(src=t.src, dest=t.dest)
+        el = E.target(src=t.src, dest=str(t.dest))
         embed_flat_nodes(el, t.iter_flat_nodes())
         parent.append(el)

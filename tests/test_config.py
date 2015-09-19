@@ -1,4 +1,5 @@
 import contextlib
+import pathlib
 import unittest
 import unittest.mock
 
@@ -124,11 +125,11 @@ class Testsave_targets(unittest.TestCase):
 
         target1 = base.target1
         target1.src = "foo"
-        target1.dest = "bar"
+        target1.dest = pathlib.Path("bar")
 
         target2 = base.target2
         target2.src = "baz"
-        target2.dest = "fnord"
+        target2.dest = pathlib.Path("fnord")
 
         with contextlib.ExitStack() as stack:
             embed_flat_nodes = stack.enter_context(unittest.mock.patch(
