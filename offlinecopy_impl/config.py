@@ -35,3 +35,21 @@ def save_targets(parent, targets):
         el = E.target(src=t.src, dest=str(t.dest))
         embed_flat_nodes(el, t.iter_flat_nodes())
         parent.append(el)
+
+
+class Config:
+    @staticmethod
+    def parse_stringlist(s):
+        import ast
+        value = ast.literal_eval(s)
+        if     (not isinstance(value, list) or
+                not all(isinstance(item, str) for item in value)):
+            raise ValueError('value must be a list of strings (["foo", "bar"])')
+        return value
+
+    def __init__(self, parser):
+        cfgvalue = parser.get("offlinecopy", "rsync-args", fallback="").strip()
+        if not cfgvalue:
+            self.rsync_args = []
+        else:
+            self.rsync_args = self.parse_stringlist(cfgvalue)

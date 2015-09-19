@@ -46,9 +46,7 @@ def FilterFile(t):
 def rsync_invocation_base(cfg, verbosity=0, delete=True):
     cmd = ["rsync", "-raHEAXS", "--protect-args"]
 
-    options = cfg.get("offlinecopy", "rsync-options", fallback="").strip()
-    if options:
-        cmd.append(options)
+    cmd.extend(cfg.rsync_options)
 
     if delete:
         cmd.append("--delete")
@@ -602,11 +600,11 @@ any of its contents) from synchronisation."""
         print("no command selected", file=sys.stderr)
         sys.exit(1)
 
-    config = read_config(get_config_path())
+    cfg = config.Config(read_config(get_config_path()))
     targets = read_targets(get_targets_path())
 
     try:
-        sys.exit(args.cmd(args, config, targets) or 0)
+        sys.exit(args.cmd(args, cfg, targets) or 0)
     except OSError as exc:
         print(exc)
         sys.exit(1)
