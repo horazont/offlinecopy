@@ -250,16 +250,17 @@ def cmdfunc_push(args, cfg, targets):
         args.dry_run = DryRunMode.RSYNC
         args.verbosity = 1
 
+    all_targets = frozenset(targets)
     selection = {pathlib.Path(path).resolve() for path in args.targets}
 
     if not selection:
-        matched_targets = list(targets)
+        matched_targets = set(targets)
     else:
-        matched_targets = []
+        matched_targets = set()
         for t in targets:
             target_dest = pathlib.Path(t.dest).resolve()
             if target_dest in selection:
-                matched_targets.append(t)
+                matched_targets.add(t)
                 selection.remove(target_dest)
 
         if selection:
@@ -267,6 +268,16 @@ def cmdfunc_push(args, cfg, targets):
                 print("no matching target for paths:", file=sys.stderr)
                 print("  {}".format(path), file=sys.stderr)
                 sys.exit(1)
+
+    if args.not_:
+        matched_targets = all_targets - matched_targets
+
+    if not matched_targets:
+        print("no targets selected")
+        sys.exit(1)
+
+    matched_targets = sorted(matched_targets,
+                             key=lambda target: target.dest)
 
     for t in matched_targets:
         rsync_target(cfg, t,
@@ -491,6 +502,14 @@ any of its contents) from synchronisation."""
         default=False,
         help="Equivalent to `--dry-run rsync' and `-v`, i.e. shows the diff to"
         " the remote."
+    )
+    cmd_push.add_argument(
+        "--not",
+        dest="not_",
+        action="store_true",
+        default=False,
+        help="Invert selection of targets (i.e. specify targets *not* to push "
+        "instead of targets to push)."
     )
     cmd_push.add_argument(
         "targets",
