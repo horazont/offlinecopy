@@ -46,7 +46,7 @@ def FilterFile(t):
 def rsync_invocation_base(cfg, verbosity=0, delete=True):
     cmd = ["rsync", "-raHEAXS", "--protect-args"]
 
-    cmd.extend(cfg.rsync_options)
+    cmd.extend(cfg.rsync_args)
 
     if delete:
         cmd.append("--delete")
