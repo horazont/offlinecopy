@@ -154,6 +154,7 @@ class TestTarget(unittest.TestCase):
             self.src,
             self.dest
         )
+        self.target.include("/")
 
     def test_init_attributes(self):
         self.assertEqual(
@@ -318,6 +319,7 @@ class TestTarget(unittest.TestCase):
         self.assertSequenceEqual(
             list(self.target.iter_flat_nodes()),
             [
+                (target.State.INCLUDED, ""),
             ]
         )
 
@@ -329,6 +331,7 @@ class TestTarget(unittest.TestCase):
         self.assertSequenceEqual(
             list(self.target.iter_flat_nodes()),
             [
+                (target.State.INCLUDED, ""),
                 (target.State.EVICTED, "A"),
                 (target.State.INCLUDED, "A/B/C"),
                 (target.State.EVICTED, "A/B/C/D"),
@@ -340,6 +343,7 @@ class TestTarget(unittest.TestCase):
         self.assertSequenceEqual(
             list(self.target.iter_flat_nodes()),
             [
+                (target.State.INCLUDED, ""),
             ]
         )
 

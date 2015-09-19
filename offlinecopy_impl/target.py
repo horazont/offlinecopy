@@ -69,7 +69,8 @@ class Node:
             )
 
         if self.state == State.INCLUDED:
-            yield ("+", None)
+            if self.parent is not None:
+                yield ("+", None)
         elif self.childmap and self.get_state() == State.EVICTED:
             yield ("-", "*")
             if     (self.parent is not None and
@@ -111,6 +112,7 @@ class Target:
         self.dest = dest
 
         self.rules = Node()
+        self.rules.state = State.EVICTED
 
     def iter_filter_rules(self):
         return self.rules.iter_rules()
