@@ -601,4 +601,8 @@ any of its contents) from synchronisation."""
     config = read_config(get_config_path())
     targets = read_targets(get_targets_path())
 
-    args.cmd(args, config, targets)
+    try:
+        sys.exit(args.cmd(args, config, targets) or 0)
+    except OSError as exc:
+        print(exc)
+        sys.exit(1)
