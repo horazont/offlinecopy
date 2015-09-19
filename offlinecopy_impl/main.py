@@ -280,6 +280,8 @@ def cmdfunc_push(args, cfg, targets):
                              key=lambda target: target.dest)
 
     for t in matched_targets:
+        if args.verbosity > 0:
+            print("pushing target {!r}".format(str(t.dest)))
         rsync_target(cfg, t,
                      additional_args=args.rsync_opts,
                      dry_run=args.dry_run,
