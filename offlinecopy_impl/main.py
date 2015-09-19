@@ -342,7 +342,16 @@ remote target (or possibly another directory)."""
 
     cmd_add = subparsers.add_parser(
         "add",
-        help="Add a new synchronization target"
+        help="Add a new synchronization target",
+        description="""\
+        Add a synchronization target. A synchronization target consists of a
+        remote source (using standard scp/rsync syntax like `user@host:/path')
+        and a destination (a local path). Inside each target, files and
+        directories can be included and excluded individually using the include
+        and exclude subcommands. Adding a target does not transfer any files
+        from or to the source. New targets are created so that their root is
+        excluded and you can summon the whole target or individual parts using
+        the summon subcommand."""
     )
     cmd_add.add_argument(
         "source",
@@ -352,8 +361,11 @@ remote target (or possibly another directory)."""
     cmd_add.add_argument(
         "dest",
         metavar="DEST",
-        help="Path for the destination of the target. This must not be within"
-        " another target"
+        help="""\
+        Path for the destination of the target. This must not be within another
+        target (see include/exclude for excluding or including specific parts
+        of a target). The path is automatically canonicalized (i.e. symlinks
+        and relative paths are resolved)."""
     )
     cmd_add.set_defaults(cmd=cmdfunc_add)
 
@@ -361,7 +373,8 @@ remote target (or possibly another directory)."""
         "remove",
         help="Remove an existing synchronization target",
         description="""\
-Removes the target from the bookkeeping. This does not delete any files."""
+        Removes the target from the bookkeeping. This does not delete any
+        files, but all include/exclude state is gone."""
     )
     cmd_remove.add_argument(
         "dest",
@@ -392,7 +405,13 @@ any of its contents) from synchronisation."""
 
     cmd_include = subparsers.add_parser(
         "include",
-        help="(Re-)include a previously evicted (sub-)directory"
+        help="(Re-)include a previously evicted (sub-)directory",
+        description="""\
+        The include command marks a path for being included into the
+        synchronization process. This does not transfer any files from or to
+        the source. Use summon if you want to prime the included directory
+        with remote contents and see summon --help for advantages of using
+        summon over include + revert."""
     )
     cmd_include.add_argument(
         "path",
@@ -427,11 +446,11 @@ any of its contents) from synchronisation."""
         "push",
         help="Transfer one or more targets to their source",
         description="""\
-Synchronize all matching targets to their source. This is done with
---delete, so that files deleted locally are propagated back to the origin.
-If you do not want that behaviour, use the evict subcommand to mark directories
-which are just deleted locally and whose deletion shall not propagate back to
-the source."""
+        Synchronize all matching targets to their source. This is done with
+        --delete, so that files deleted locally are propagated back to the
+        origin. If you do not want that behaviour, use the evict subcommand to
+        mark directories which are just deleted locally and whose deletion
+        shall not propagate back to the source."""
     )
     cmd_push.add_argument(
         "--diff",
@@ -455,8 +474,11 @@ the source."""
         "revert",
         help="Transfer one or more targets from their source",
         description="""\
-Any matched target is re-transmitted from the source; the existing contents
-which are not evicted are removed from the destination."""
+        Any matched target is re-transmitted from the source; the existing
+        contents which are not evicted are removed from the destination. This
+        is a potentially dangerous operation which is why you have to name all
+        targets explicitly or use --all if you want to apply it to all
+        targets."""
     )
     cmd_revert.add_argument(
         "--all",
@@ -477,8 +499,9 @@ which are not evicted are removed from the destination."""
     cmd_revert.set_defaults(cmd=cmdfunc_revert)
 
     cmd_status = subparsers.add_parser(
-        "list",
-        help="List all targets"
+        "status",
+        aliases=["list"],
+        help="Show the target configuration"
     )
     cmd_status.set_defaults(cmd=cmdfunc_list)
 
