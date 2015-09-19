@@ -329,6 +329,19 @@ def cmdfunc_list(args, cfg, targets):
             print("  {} {}".format(state, path))
 
 
+def cmdfunc_set_source(args, cfg, targets):
+    path = pathlib.Path(args.target).resolve()
+    target = get_target_by_path(targets, path)
+    if not target:
+        print("error: {!r} is not a target".format(str(path)),
+              file=sys.stderr)
+        return 1
+
+    target.src = args.source
+
+    write_targets(get_targets_path(), targets)
+
+
 class DryRunMode(Enum):
     LOCAL = "local"
     RSYNC = "rsync"
@@ -551,6 +564,26 @@ any of its contents) from synchronisation."""
     dry_run_argument(cmd_revert)
     rsync_opts_argument(cmd_revert)
     cmd_revert.set_defaults(cmd=cmdfunc_revert)
+
+    cmd_set_source = subparsers.add_parser(
+        "set-source",
+        help="Change the source of a target",
+        description="""\
+        Set the remote source of a target to a different path. No
+        synchronization happens during this command."""
+    )
+    cmd_set_source.add_argument(
+        "target",
+        metavar="PATH",
+        help="Path identifying the target locally."
+    )
+    cmd_set_source.add_argument(
+        "source",
+        metavar="SOURCE",
+        help="New source for the target. The same rules as for the add"
+        " subcommand apply.",
+    )
+    cmd_set_source.set_defaults(cmd=cmdfunc_set_source)
 
     cmd_status = subparsers.add_parser(
         "status",
