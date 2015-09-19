@@ -42,12 +42,8 @@ def FilterFile(t):
             os.unlink(f.name)
 
 
-def rsync_target(cfg, t,
-                 verbosity=0,
-                 revert=False,
-                 dry_run=False,
-                 delete=True):
-    cmd = ["rsync", "-raHEAXS"]
+def rsync_invocation_base(cfg, verbosity=0, delete=True):
+    cmd = ["rsync", "-raHEAXS", "--protect-args"]
 
     options = cfg.get("offlinecopy", "rsync-options", fallback="").strip()
     if options:
@@ -63,8 +59,22 @@ def rsync_target(cfg, t,
     if verbosity <= 2:
         cmd.append("--progress")
 
+    return cmd
+
+
+def rsync_target(cfg, t,
+                 additional_args=[],
+                 verbosity=0,
+                 revert=False,
+                 dry_run=False,
+                 delete=True):
+    cmd = rsync_invocation_base(cfg,
+                                verbosity=verbosity,
+                                delete=delete)
+
     with FilterFile(t) as name:
         cmd.extend(["--filter", ". {}".format(name)])
+        cmd.extend(additional_args)
         if revert:
             cmd.append(t.src + "/")
             cmd.append(t.dest + "/")
@@ -151,7 +161,7 @@ def cmdfunc_remove(args, cfg, targets):
     write_targets(get_targets_path(), targets)
 
 
-def cmdfunc_evict(args, cfg, targets):
+def cmdfunc_exclude(args, cfg, targets):
     path = os.path.realpath(args.path)
     t, relpath = get_target_from_path(targets, path)
 
@@ -169,7 +179,7 @@ def cmdfunc_evict(args, cfg, targets):
 
     write_targets(get_targets_path(), targets)
 
-    if args.delete:
+    if args.evict:
         shutil.rmtree(path)
 
 
@@ -188,7 +198,23 @@ def cmdfunc_include(args, cfg, targets):
     t.include(relpath)
     t.prune()
 
-    write_targets(get_targets_path(), targets)
+    if args.summon:
+        cmd = rsync_invocation_base(cfg,
+                                    verbosity=args.verbosity,
+                                    delete=False)
+        if args.dry_run:
+            apply_dry_run_mode(cmd, args.dry_run)
+
+        cmd.extend(args.rsync_opts)
+        cmd.append("--ignore-existing")
+
+        cmd.append(os.path.join(t.src, relpath[1:])+"/")
+        cmd.append(os.path.join(t.dest, relpath[1:])+"/")
+
+        subprocess.check_call(cmd)
+
+    if not args.dry_run:
+        write_targets(get_targets_path(), targets)
 
 
 def cmdfunc_push(args, cfg, targets):
@@ -215,6 +241,7 @@ def cmdfunc_push(args, cfg, targets):
 
     for t in matched_targets:
         rsync_target(cfg, t,
+                     additional_args=args.rsync_opts,
                      dry_run=args.dry_run,
                      revert=False,
                      verbosity=args.verbosity)
@@ -243,6 +270,7 @@ def cmdfunc_revert(args, cfg, targets):
 
     for t in matched_targets:
         rsync_target(cfg, t,
+                     additional_args=args.rsync_opts,
                      dry_run=args.dry_run,
                      revert=True,
                      verbosity=args.verbosity)
@@ -279,6 +307,19 @@ def dry_run_argument(parser):
         " specifies the dry-run mode. With `local', the rsync commands are"
         " printed, but not executed. With `rsync', rsync gets passed the"
         " --dry-run argument."
+    )
+
+
+def rsync_opts_argument(parser):
+    parser.add_argument(
+        "--rsync",
+        dest="rsync_opts",
+        action="append",
+        default=[],
+        metavar="OPTION",
+        help="Options to use in calls to rsync during this command and only"
+        " during this command. They are not saved in the configuration. Make"
+        " sure to use --rsync=OPTION syntax to pass options starting with `-'."
     )
 
 
@@ -329,25 +370,25 @@ Removes the target from the bookkeeping. This does not delete any files."""
     )
     cmd_remove.set_defaults(cmd=cmdfunc_remove)
 
-    cmd_evict = subparsers.add_parser(
-        "evict",
-        help="Evict a directory from synchronization",
+    cmd_exclude = subparsers.add_parser(
+        "exclude",
+        help="Exclude a directory from synchronization",
         description="""\
 This excludes the file or directory (and in the case of an directory,
 any of its contents) from synchronisation."""
     )
-    cmd_evict.add_argument(
+    cmd_exclude.add_argument(
         "path",
         metavar="PATH",
         help="Path to the node to exclude"
     )
-    cmd_evict.add_argument(
-        "--delete",
+    cmd_exclude.add_argument(
+        "--evict", "--delete",
         action="store_true",
         default=False,
         help="Delete the file or directory after evicting"
     )
-    cmd_evict.set_defaults(cmd=cmdfunc_evict)
+    cmd_exclude.set_defaults(cmd=cmdfunc_exclude)
 
     cmd_include = subparsers.add_parser(
         "include",
@@ -358,7 +399,29 @@ any of its contents) from synchronisation."""
         metavar="PATH",
         help="Path to the node to include"
     )
-    cmd_include.set_defaults(cmd=cmdfunc_include)
+    dry_run_argument(cmd_include)
+    rsync_opts_argument(cmd_include)
+    cmd_include.set_defaults(cmd=cmdfunc_include, summon=False)
+
+    cmd_summon = subparsers.add_parser(
+        "summon",
+        help="(Re-)include and copy a directory to the local file system",
+        description="""\
+        When summoning, the files from the source are transferred to the local
+        file system. Using summon has three advantages over using include and
+        revert: first, other directories inside the target are not affected;
+        second, when summoning, local files are not deleted or overwritten in
+        favour of remote files; third, the directory is only marked as included
+        after a successful transfer has taken place."""
+    )
+    cmd_summon.add_argument(
+        "path",
+        metavar="PATH",
+        help="Path to the node to include"
+    )
+    dry_run_argument(cmd_summon)
+    rsync_opts_argument(cmd_summon)
+    cmd_summon.set_defaults(cmd=cmdfunc_include, summon=True)
 
     cmd_push = subparsers.add_parser(
         "push",
@@ -385,6 +448,7 @@ the source."""
         "all targets are synced back"
     )
     dry_run_argument(cmd_push)
+    rsync_opts_argument(cmd_push)
     cmd_push.set_defaults(cmd=cmdfunc_push)
 
     cmd_revert = subparsers.add_parser(
@@ -409,6 +473,7 @@ which are not evicted are removed from the destination."""
         help="One or more target destination directories."
     )
     dry_run_argument(cmd_revert)
+    rsync_opts_argument(cmd_revert)
     cmd_revert.set_defaults(cmd=cmdfunc_revert)
 
     cmd_status = subparsers.add_parser(
