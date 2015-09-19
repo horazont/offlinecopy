@@ -511,8 +511,8 @@ any of its contents) from synchronisation."""
         description="""\
         Synchronize all matching targets to their source. This is done with
         --delete, so that files deleted locally are propagated back to the
-        origin. If you do not want that behaviour, use the evict subcommand to
-        mark directories which are just deleted locally and whose deletion
+        origin. If you do not want that behaviour, use the exclude subcommand
+        to mark directories which are just deleted locally and whose deletion
         shall not propagate back to the source."""
     )
     cmd_push.add_argument(
