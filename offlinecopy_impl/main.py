@@ -162,11 +162,11 @@ def cmdfunc_add(args, cfg, targets):
         target_dest = t.dest.resolve()
         if target_dest in parents or dest == target_dest:
             print("error: the destination is already covered by another target"
-                  ": {}".format(t.dest))
+                  ": {}".format(t.dest), file=sys.stderr)
             sys.exit(1)
         if dest in target_dest.parents:
             print("error: the destination is parent of another target"
-                  ": {}".format(t.dest))
+                  ": {}".format(t.dest), file=sys.stderr)
             sys.exit(1)
 
     new_target = target.Target(args.source, dest)
@@ -199,7 +199,8 @@ def cmdfunc_exclude(args, cfg, targets):
 
     state = t.get_state(relpath)
     if state == target.State.EVICTED:
-        print("already evicted: {}".format(relpath), file=sys.stderr)
+        print("error: already excluded: {!r}".format(relpath),
+              file=sys.stderr)
         sys.exit(1)
 
     t.evict(relpath)
@@ -215,12 +216,14 @@ def cmdfunc_include(args, cfg, targets):
     path = pathlib.Path(args.path).resolve()
     t, relpath = get_target_from_path(targets, path)
     if t is None:
-        print("not target holds {}".format(path), file=sys.stderr)
+        print("error: {!r} is not in any target".format(str(path)),
+              file=sys.stderr)
         sys.exit(1)
 
     state = t.get_state(relpath)
     if state == target.State.INCLUDED:
-        print("already included: {}".format(relpath), file=sys.stderr)
+        print("error: {!r} is already included".format(relpath),
+              file=sys.stderr)
         sys.exit(1)
 
     t.include(relpath)
@@ -265,15 +268,15 @@ def cmdfunc_push(args, cfg, targets):
 
         if selection:
             for path in selection:
-                print("no matching target for paths:", file=sys.stderr)
-                print("  {}".format(path), file=sys.stderr)
+                print("error: no matching target for paths:", file=sys.stderr)
+                print("  {!r}".format(str(path)), file=sys.stderr)
                 sys.exit(1)
 
     if args.not_:
         matched_targets = all_targets - matched_targets
 
     if not matched_targets:
-        print("no targets selected")
+        print("note: no targets selected", file=sys.stderr)
         sys.exit(1)
 
     matched_targets = sorted(matched_targets,
@@ -293,7 +296,8 @@ def cmdfunc_revert(args, cfg, targets):
     selection = {pathlib.Path(path).resolve() for path in args.targets}
 
     if not selection and not args.map_none_to_all:
-        print("no target selected (did you mean --all?)", file=sys.stderr)
+        print("error: no target selected (did you mean --all?)",
+              file=sys.stderr)
         sys.exit(1)
     elif not selection:
         matched_targets = list(targets)
@@ -307,7 +311,7 @@ def cmdfunc_revert(args, cfg, targets):
 
         if selection:
             for path in selection:
-                print("no matching target for paths:", file=sys.stderr)
+                print("error: no matching target for paths:", file=sys.stderr)
                 print("  {}".format(path), file=sys.stderr)
                 sys.exit(1)
 
